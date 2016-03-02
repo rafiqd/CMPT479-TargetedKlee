@@ -49,7 +49,7 @@ struct CallGraphPrinter : public ModulePass {
 
   CallGraphPrinter(raw_ostream &out)
     : ModulePass{ID},
-      out{out}
+      out(out)
       { }
 
   bool

@@ -11,8 +11,37 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <deque>
+#include <vector>
+
+
 
 namespace callgraphs {
+
+struct CallInfo{
+  public:
+    CallInfo( llvm::Function *n, unsigned line, llvm::StringRef fname,
+              unsigned csnum): name(n), lineNum(line), filename(fname), 
+              callSiteNum(csnum) {}
+    llvm::Function* getFunction(){ return name; }
+  
+    llvm::Function *name;
+    unsigned lineNum;
+    llvm::StringRef filename;
+    unsigned callSiteNum;
+};
+
+struct FunctionInfo{
+  public:
+    std::vector< CallInfo > directCalls;
+    std::vector< CallInfo > possibleCalls;    
+    unsigned int callCount;
+    unsigned int weight;
+    llvm::Function *name;
+    
+    FunctionInfo( llvm::Function *n ): name(n), callCount(0), weight(0) {}
+    llvm::Function* getFunction(){ return name; };
+
+};
 
 
 struct CallGraphPass : public llvm::ModulePass {
@@ -20,6 +49,9 @@ struct CallGraphPass : public llvm::ModulePass {
   static char ID;
 
 public:
+
+  std::vector< FunctionInfo > funcList;
+  llvm::DenseMap< llvm::Function*, FunctionInfo > funcs;
   CallGraphPass()
     : ModulePass(ID)
       { }
@@ -30,6 +62,8 @@ public:
   }
 
   bool runOnModule(llvm::Module &m) override;
+  void handleInstruction(llvm::CallSite cs, FunctionInfo *fun, llvm::Module &m);
+
 };
 
 
@@ -54,5 +88,6 @@ struct WeightedCallGraphPass : public llvm::ModulePass {
 
 
 }
+
 
 #endif
