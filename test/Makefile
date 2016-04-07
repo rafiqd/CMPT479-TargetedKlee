@@ -18,7 +18,7 @@
 #   make clean
 #
 
-CALLGRAPHER  := ../../cgbuild/bin/callgrapher
+CALLGRAPHER  := ../../callgrapher/bin/callgrapher
 CSV_TO_GV    := ../scripts/csv_to_gv.py
 CLANG        := clang
 OPT          := opt

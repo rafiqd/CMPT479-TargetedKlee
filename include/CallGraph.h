@@ -32,13 +32,14 @@ struct CallInfo{
 
 struct FunctionInfo{
   public:
+    std::string filename;
     std::vector< CallInfo > directCalls;
     std::vector< CallInfo > possibleCalls;    
     unsigned int callCount;
     unsigned int weight;
+    unsigned int bugweight;
     llvm::Function *name;
-    
-    FunctionInfo( llvm::Function *n ): name(n), callCount(0), weight(0) {}
+    FunctionInfo( llvm::Function *n ): name(n), callCount(0), weight(0), bugweight(0) {}
     llvm::Function* getFunction(){ return name; };
 
 };

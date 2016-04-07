@@ -7,6 +7,11 @@
 #include <deque>
 #include <iterator>
 
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <string>
+
 using namespace llvm;
 using namespace callgraphs;
 
@@ -54,7 +59,6 @@ CallGraphPass::handleInstruction(llvm::CallSite cs, callgraphs::FunctionInfo *fu
   if (!cs.getInstruction()) {
     return;
   }
-
   // Check whether the called function is directly invoked
   auto called = dyn_cast<Function>(cs.getCalledValue()->stripPointerCasts());
   if (!called) {
@@ -100,11 +104,20 @@ CallGraphPass::handleInstruction(llvm::CallSite cs, callgraphs::FunctionInfo *fu
     
   // Direct Calls heres
   DILocation *Loc = cs.getInstruction()->getDebugLoc();
-  callgraphs::CallInfo ci(called, Loc->getLine() , Loc->getFilename(), 
+  if( Loc ){
+    callgraphs::CallInfo ci(called, Loc->getLine() , Loc->getFilename(), 
     funcs.find( fun->getFunction() )->second.callCount  );
-  funcs.find( called )->second.weight++;
-  funcs.find( fun->getFunction() )->second.directCalls.push_back( ci );
-  funcs.find( fun->getFunction() )->second.callCount++;
+    funcs.find( fun->getFunction() )->second.directCalls.push_back( ci );
+    funcs.find( fun->getFunction() )->second.callCount++;
+    fun->filename = Loc->getFilename();
+  }else{
+    callgraphs::CallInfo ci(called, 0, "unknown", 
+    funcs.find( fun->getFunction() )->second.callCount  );
+    funcs.find( called )->second.weight++;
+    funcs.find( fun->getFunction() )->second.directCalls.push_back( ci );
+    funcs.find( fun->getFunction() )->second.callCount++;
+    fun->filename = "unknown";
+  }
   
 }
 
@@ -145,7 +158,7 @@ WeightedCallGraphPass::print(raw_ostream &out, const Module *m) const {
 
   // Separate functions and edges by a blank line
   out << "\n";
-
+#if FALSE
   for ( auto &kvPair : cgPass.funcs ) {
     FunctionInfo fi = kvPair.second;
     for ( auto ci : fi.directCalls ) {
@@ -153,5 +166,69 @@ WeightedCallGraphPass::print(raw_ostream &out, const Module *m) const {
           "," << ci.getFunction()->getName() << "\n";
     }
   }
+#endif
+  
+  std::ifstream file;
+  file.open ("hotspots");
+  
+  std::map<std::string,unsigned> bugFrequency;
+  if( file.is_open() ){
+    std::string line;
+    while ( std::getline(file,line) ){
+      std::stringstream ss(line);
+      std::string fname;
+      unsigned freq;
+      ss >> fname >> freq;
+      errs() << "fname:" << fname << " freq:" << freq << "\n";
+      std::pair<std::string,unsigned> p( fname, freq);
+      bugFrequency.insert( p );
+    }
+    file.close();
+  }
+  
+
+  for ( auto &kvPair : cgPass.funcs ){
+    FunctionInfo fi = kvPair.second;
+    // if this function is in a hotspot file  fi =  +(3*num of bug frequency) to weight here
+    out << fi.getFunction()->getName() << "\n";
+    auto depth1 = bugFrequency.find( fi.filename );
+    if( depth1 != bugFrequency.end() ){
+      fi.bugweight += 3 * ( depth1->second );
+      errs() << "d1\n";
+    }
+    
+    for( auto ci: fi.directCalls ){
+      auto found = cgPass.funcs.find( ci.getFunction() );
+      if( found != cgPass.funcs.end() ){
+        out << "\t" << found->second.getFunction()->getName() << "\n";
+        // if found->second.getfunction is in a hotspot file fi = +(2*num of bug frequency ) to weight
+        auto depth2 = bugFrequency.find( found->second.filename );
+        if( depth2 != bugFrequency.end() ){
+          fi.bugweight += 2 * ( depth2->second );
+          errs() << "d2\n";
+        }
+        
+        for( auto ci2 : found->second.directCalls ){
+          // if in hotspot, fi = +(1*num of bug freq) to weight
+          auto found2 = cgPass.funcs.find( ci2.getFunction() );
+          if( found2 != cgPass.funcs.end() ){
+            auto depth3 = bugFrequency.find( found2->second.filename );
+            if( depth3 != bugFrequency.end() ){
+              fi.bugweight += depth3->second;  
+              errs() << "d3\n";
+            }
+          }
+           out << "\t\t" << ci2.getFunction()->getName() << "\n";
+        }
+        
+      }
+    }
+  }
+  
+  for( auto &kvPair : cgPass.funcs ){
+    FunctionInfo fi = kvPair.second;
+    out << fi.getFunction()->getName() << " has weight:" << fi.bugweight << "\n";
+  }
+  
 }
 
