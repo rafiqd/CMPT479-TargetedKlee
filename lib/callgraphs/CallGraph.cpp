@@ -59,6 +59,7 @@ CallGraphPass::handleInstruction(llvm::CallSite cs, callgraphs::FunctionInfo *fu
   if (!cs.getInstruction()) {
     return;
   }
+  
   // Check whether the called function is directly invoked
   auto called = dyn_cast<Function>(cs.getCalledValue()->stripPointerCasts());
   if (!called) {
@@ -127,8 +128,39 @@ bool
 WeightedCallGraphPass::runOnModule(Module &m) {
   // The results of the call graph pass can be extracted and used here.
   auto &cgPass = getAnalysis<CallGraphPass>();
-
-  // TODO Use the call graph to compute function weights.
+  
+  for( auto &f : m ){
+    errs() << "\n";
+    if( f.getName() == "llvm.dbg.declare"){
+    continue;
+    }
+    for( auto &bb : f ){
+      for( auto &i : bb){
+        //errs() << i << "\n";
+        if( i.hasMetadata() && i.getMetadata("weight") ){
+          //errs() << "i has meta data --";
+          //errs() << i.getMetadata("weight")->getNumOperands() << "--";
+          //errs() << cast<MDString>(i.getMetadata("weight")->getOperand(0))->getString() << "--\n";
+        }
+          
+        
+        llvm::CallSite cs( (llvm::Instruction*) &i ); 
+        if( cs.isCall() ){
+          auto found = cgPass.funcs.find( cs.getCalledFunction() );
+          if( found != cgPass.funcs.end() ){
+            int weight = found->second.bugweight;
+            for( auto &ii : *i.getParent() ){
+              auto &context = ii.getContext();
+              auto *str = MDString::get(context, StringRef( std::to_string( weight ) ) );
+              auto *node = MDNode::get(context, str);
+              ii.setMetadata(StringRef("weight"), node);
+            }
+          }
+        }
+        
+      }
+    }
+  }
 
   return false;
 }
@@ -229,6 +261,9 @@ WeightedCallGraphPass::print(raw_ostream &out, const Module *m) const {
     FunctionInfo fi = kvPair.second;
     out << fi.getFunction()->getName() << " has weight:" << fi.bugweight << "\n";
   }
+
+
   
+
 }
 

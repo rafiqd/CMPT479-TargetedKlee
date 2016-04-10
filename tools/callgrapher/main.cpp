@@ -96,8 +96,8 @@ main (int argc, char **argv, const char **env) {
   // Build up all of the passes that we want to run on the module.
   PassManager pm;
   pm.add(new callgraphs::CallGraphPass);
-  pm.add(new callgraphs::WeightedCallGraphPass);
   pm.add(new CallGraphPrinter<callgraphs::WeightedCallGraphPass>(outs()));
+  pm.add(new callgraphs::WeightedCallGraphPass);
   pm.run(*module);
 
   return 0;
